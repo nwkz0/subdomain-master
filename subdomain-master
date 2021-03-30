@@ -1,0 +1,100 @@
+#!/bin/bash
+
+# // l314 0 c0d1g0 p4r4 3nt3nd3r 0qu3 35t4 4c0nt3c3nd0 v4g4b#nd0 // #
+
+if [[ $1 == "" || $2 == "" ]];then
+	printf "\n./subdomain-brute 'host' 'ip' 'range_init' 'range_end'\n"
+	printf "\nex1: ./subdomain-brute prf.gov.br 138.122.112\n"
+	printf "ex2: ./subdomain-brute prf.gov.br 138.122.112 129 254\n\n"
+	exit 0
+fi
+
+# verifica na variavel $PATH se o command 'host' existe
+if [ ! -f $host ];then
+	printf "\ncannout find host command, download dnsutils\n\n";exit 0
+fi
+
+wordlist()
+{
+        printf "\nwordlist path: ";read wordpath
+
+        if [ ! -f $wordpath ];then
+                printf "\nwordlist not found!\n\n"
+		wordlist
+        fi
+}
+
+protoc()
+{
+	printf "\nhttp or https: ";read protocol
+        if [ ! $protocol == "https" ] && [ ! $protocol == "http" ];then
+                printf "\njust http or https !!\n\n"
+		protoc
+        fi
+}
+
+threadfunction()
+{
+        printf "\nthreads (default 40): ";read threads
+        [ $threads == "" ] && threadfunction
+}
+
+printf "\n# +++++++++++++++++++++++++++++++++++++++++++~+ RUNNING +~+++++++++++++++++++++++++++++++++++++++++++++ #\n"
+
+# faz resolucao de ip para nome - Reverse DNS
+if [ ! $3 == "" ] && [ ! $4 == "" ];then
+       	for range in $(seq $3 $4);do
+       		host -W 1 $2.$range|grep -v "NXDOMAIN"|grep "$1"|awk '{print $5}' >> reverdomains.txt
+        done
+else	
+	for range in $(seq 0 255);do
+		host -W 1 $2.$range|grep -v "NXDOMAIN"|grep "$1"|awk '{print $5}' >> reverdomains.txt
+	done
+fi
+
+printf "\n[+] Reverse DNS - Subdomains Founds [+]\n\n"
+sed s/.$// reverdomains.txt
+
+# puxa os name-servers padroes do host e tenta transferencia de zona
+for ns in $(host -t ns $1|cut -d" " -f4);do
+	printf "\nNAME-SERVER: %s\n\n" $ns
+	host -t axfr $1 $ns|grep -v "Using domain server\|Name:\|Address\|Aliases\|Transfer failed\|REFUSED\|Trying"
+done
+
+printf "\n\n~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+\n\n"
+printf "~: Bruteforce (Y/n): ";read brute
+
+if [[ $brute == "Y" || $brute == "" ]];then
+
+	if [ ! -f $ffuf ];then printf "\nffuf not found!\n\n";exit 0;fi
+
+	# fuction call's
+	protoc
+	wordlist
+	threadfunction
+
+	ffuf -H "User-Agent:Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.90 Safari/537.36" -s -ic -u "$protocol://FUZZ.$1" -w "$wordpath" -t $threads >> sublog.txt
+
+	printf "\n[+] Subdomains Found [+]\n\n"
+
+	for verbose in $(cat sublog.txt);do
+		printf "%s://%s.%s\n" $protocol $verbose $1
+	done
+
+
+	printf "$(cat reverdomains.txt|cut -d"." -f1)\n$(cat sublog.txt)" > subdomains.txt
+	printf "\n\n++++++++++++++++++++++++++++++++++++++++++++ ALIAS +++++++++++++++++++++++++++++++++++++++++++++++++++\n\n"
+
+	for alias in $(cat subdomains.txt);do
+		host -W 2 -t cname $alias.$1|grep -v "NXDOMAIN\|has no CNAME record"
+	done
+
+	printf "\n\n~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+\n\n"
+
+	for ip in $(cat subdomains.txt);do
+		host -W 1 -t A $ip.$1
+	done
+fi
+
+echo
+rm -f sublog.txt reverdomains.txt subdomains.txt
