@@ -3,9 +3,9 @@
 # // l314 0 c0d1g0 p4r4 3nt3nd3r 0qu3 35t4 4c0nt3c3nd0 v4g4b#nd0 // #
 
 if [[ $1 == "" || $2 == "" ]];then
-	printf "\n./subdomain-brute 'host' 'ip' 'range_init' 'range_end'\n"
-	printf "\nex1: ./subdomain-brute prf.gov.br 138.122.112\n"
-	printf "ex2: ./subdomain-brute prf.gov.br 138.122.112 129 254\n\n"
+	printf "\n./subdomain-master 'host' 'ip' 'range_init' 'range_end'\n"
+	printf "\n	ex 1: subdomain-master prf.gov.br 138.122.112\n"
+	printf "	ex 2: subdomain-master prf.gov.br 138.122.112 129 254\n\n"
 	exit 0
 fi
 
@@ -13,6 +13,10 @@ fi
 if [ ! -f $host ];then
 	printf "\ncannout find host command, download dnsutils\n\n";exit 0
 fi
+
+# variaveis globais
+HOST=$1
+IP=$2
 
 wordlist()
 {
@@ -37,6 +41,47 @@ threadfunction()
 {
         printf "\nthreads (default 40): ";read threads
         [ $threads == "" ] && threadfunction
+}
+
+logs()
+{
+        printf "\n\n <  ALIAS > \n\n"
+
+        for alias in $(cat subdomains.txt);do
+                host -W 2 -t cname $alias.$HOST|grep -v "NXDOMAIN\|has no CNAME record"
+        done
+
+
+        printf "\n\n < IPv4 > \n\n"
+
+        for ip in $(cat subdomains.txt);do
+                host -W 1 -t A $ip.$HOST
+        done
+
+        printf "\n\n < HINFO's > \n\n"
+
+        for hinfo in $(cat subdomains.txt);do
+                host -t hinfo $hinfo.$HOST|grep -v "has no HINFO record"
+        done
+
+        printf "\n\n < IPv6 > \n\n"
+
+        for ipv6 in $(cat subdomains.txt);do
+                host -t aaaa $ipv6.$HOST|grep -v "has no AAAA record"
+        done
+
+        printf "\n\n < MX's > \n\n"
+
+        for mx in $(cat subdomains.txt);do
+                host -t mx $mx.$HOST|grep -v "has no MX record"
+        done
+
+        printf "\n\n < TXT's > \n\n"
+
+        for txt in $(cat subdomains.txt);do
+                host -t txt $txt.$HOST|grep -v "has no TXT record"
+        done
+
 }
 
 printf "\n# +++++++++++++++++++++++++++++++++++++++++++~+ RUNNING +~+++++++++++++++++++++++++++++++++++++++++++++ #\n"
@@ -78,22 +123,15 @@ if [[ $brute == "Y" || $brute == "" ]];then
 	printf "\n[+] Subdomains Found [+]\n\n"
 
 	for verbose in $(cat sublog.txt);do
-		printf "%s://%s.%s\n" $protocol $verbose $1
+		printf "%s://%s.%s/\n" $protocol $verbose $1
 	done
-
 
 	printf "$(cat reverdomains.txt|cut -d"." -f1)\n$(cat sublog.txt)" > subdomains.txt
-	printf "\n\n++++++++++++++++++++++++++++++++++++++++++++ ALIAS +++++++++++++++++++++++++++++++++++++++++++++++++++\n\n"
+	logs
 
-	for alias in $(cat subdomains.txt);do
-		host -W 2 -t cname $alias.$1|grep -v "NXDOMAIN\|has no CNAME record"
-	done
-
-	printf "\n\n~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+\n\n"
-
-	for ip in $(cat subdomains.txt);do
-		host -W 1 -t A $ip.$1
-	done
+else
+        printf "$(cat reverdomains.txt|cut -d"." -f1)" > subdomains.txt
+	logs
 fi
 
 echo
