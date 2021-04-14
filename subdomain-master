@@ -9,12 +9,10 @@ if [[ $1 == "" || $2 == "" ]];then
 	exit 0
 fi
 
-# verifica na variavel $PATH se o command 'host' existe
 if [ ! -f $host ];then
 	printf "\ncannout find host command, download dnsutils\n\n";exit 0
 fi
 
-# variaveis globais
 HOST=$1
 IP=$2
 
@@ -84,9 +82,13 @@ logs()
 
 }
 
-printf "\n# +++++++++++++++++++++++++++++++++++++++++++~+ RUNNING +~+++++++++++++++++++++++++++++++++++++++++++++ #\n"
+for x in $(seq 0 2);do
+        printf "\\";sleep 0.1;clear
+        printf "|";sleep 0.1;clear
+        printf "/";sleep 0.1;clear
+        printf "_";sleep 0.1;clear
+done
 
-# faz resolucao de ip para nome - Reverse DNS
 if [ ! $3 == "" ] && [ ! $4 == "" ];then
        	for range in $(seq $3 $4);do
        		host -W 1 $2.$range|grep -v "NXDOMAIN"|grep "$1"|awk '{print $5}' >> reverdomains.txt
@@ -97,30 +99,33 @@ else
 	done
 fi
 
-printf "\n[+] Reverse DNS - Subdomains Founds [+]\n\n"
+printf "\n~\\ DNS /~\n\n"
 sed s/.$// reverdomains.txt
 
-# puxa os name-servers padroes do host e tenta transferencia de zona
 for ns in $(host -t ns $1|cut -d" " -f4);do
 	printf "\nNAME-SERVER: %s\n\n" $ns
 	host -t axfr $1 $ns|grep -v "Using domain server\|Name:\|Address\|Aliases\|Transfer failed\|REFUSED\|Trying"
 done
 
-printf "\n\n~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+~+\n\n"
-printf "~: Bruteforce (Y/n): ";read brute
+printf "\n~\\ fuzz: ";read brute
 
 if [[ $brute == "Y" || $brute == "" ]];then
 
-	if [ ! -f $ffuf ];then printf "\nffuf not found!\n\n";exit 0;fi
+	if ! [[ -f $ffuf ]];then
+		printf "\nffuf not found!\n\n";sleep 1
+		printf "$(cat reverdomains.txt|cut -d"." -f1)" > subdomains.txt
+		logs
+		rm -f sublog.txt reverdomains.txt subdomains.txt
+		exit 0;
+	fi
 
-	# fuction call's
 	protoc
 	wordlist
 	threadfunction
 
 	ffuf -H "User-Agent:Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.90 Safari/537.36" -s -ic -u "$protocol://FUZZ.$1" -w "$wordpath" -t $threads >> sublog.txt
 
-	printf "\n[+] Subdomains Found [+]\n\n"
+	printf "\n[\\] Subdomains Found [\\]\n\n"
 
 	for verbose in $(cat sublog.txt);do
 		printf "%s://%s.%s/\n" $protocol $verbose $1
